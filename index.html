@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Conferência CRT Mercosul</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+
+<style>
+body{
+font-family:Arial;
+background:#f4f6f9;
+padding:40px;
+}
+
+.container{
+background:white;
+padding:30px;
+border-radius:10px;
+max-width:800px;
+margin:auto;
+box-shadow:0 4px 10px rgba(0,0,0,0.1);
+}
+
+h1{
+text-align:center;
+}
+
+.field{
+margin-bottom:15px;
+}
+
+label{
+font-weight:bold;
+}
+
+input{
+width:100%;
+padding:8px;
+margin-top:5px;
+}
+
+button{
+background:#0a4abf;
+color:white;
+border:none;
+padding:12px;
+width:100%;
+margin-top:20px;
+cursor:pointer;
+border-radius:6px;
+}
+
+.result{
+margin-top:20px;
+padding:15px;
+background:#eef3ff;
+border-radius:6px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🔍 Conferência CRT Mercosul</h1>
+
+<div class="field">
+<label>Upload CRT (PDF)</label>
+<input type="file" id="crtFile">
+</div>
+
+<button onclick="lerCRT()">Extrair Dados do CRT</button>
+
+<hr>
+
+<div class="field">
+<label>Remetente (CRT)</label>
+<input id="remetenteCRT" disabled>
+</div>
+
+<div class="field">
+<label>Remetente (Invoice)</label>
+<input id="remetenteInvoice">
+</div>
+
+<div class="field">
+<label>Peso Bruto (CRT)</label>
+<input id="pbCRT" disabled>
+</div>
+
+<div class="field">
+<label>Peso Bruto (Packing List)</label>
+<input id="pbPL">
+</div>
+
+<div class="field">
+<label>Peso Líquido (CRT)</label>
+<input id="plCRT" disabled>
+</div>
+
+<div class="field">
+<label>Peso Líquido (Packing List)</label>
+<input id="plPL">
+</div>
+
+<button onclick="conferir()">Conferir Documento</button>
+
+<div class="result" id="resultado"></div>
+
+</div>
+
+<script>
+
+async function lerCRT(){
+
+const file = document.getElementById("crtFile").files[0]
+
+if(!file){
+alert("Envie o CRT")
+return
+}
+
+const reader = new FileReader()
+
+reader.onload = async function(){
+
+const typedarray = new Uint8Array(this.result)
+
+const pdf = await pdfjsLib.getDocument(typedarray).promise
+
+let texto = ""
+
+for(let i=1;i<=pdf.numPages;i++){
+
+const page = await pdf.getPage(i)
+
+const content = await page.getTextContent()
+
+content.items.forEach(item=>{
+texto += item.str + " "
+})
+
+}
+
+extrairCampos(texto)
+
+}
+
+reader.readAsArrayBuffer(file)
+
+}
+
+function extrairCampos(texto){
+
+const remetenteMatch = texto.match(/LINHANYL|REMETENTE/i)
+const pbMatch = texto.match(/P\.B\.\:\s*([\d,]+)/)
+const plMatch = texto.match(/P\.L\.\:\s*([\d,]+)/)
+
+if(remetenteMatch){
+document.getElementById("remetenteCRT").value = "Remetente identificado"
+}
+
+if(pbMatch){
+document.getElementById("pbCRT").value = pbMatch[1]
+}
+
+if(plMatch){
+document.getElementById("plCRT").value = plMatch[1]
+}
+
+}
+
+function conferir(){
+
+let resultado = ""
+
+const remetCRT = document.getElementById("remetenteCRT").value
+const remetInv = document.getElementById("remetenteInvoice").value
+
+const pbCRT = document.getElementById("pbCRT").value
+const pbPL = document.getElementById("pbPL").value
+
+const plCRT = document.getElementById("plCRT").value
+const plPL = document.getElementById("plPL").value
+
+if(remetCRT === remetInv){
+
+resultado += "✅ Remetente confere<br>"
+
+}else{
+
+resultado += "⚠️ Divergência de remetente<br>"
+
+}
+
+if(pbCRT === pbPL){
+
+resultado += "✅ Peso bruto confere<br>"
+
+}else{
+
+resultado += "⚠️ Divergência peso bruto<br>"
+
+}
+
+if(plCRT === plPL){
+
+resultado += "✅ Peso líquido confere<br>"
+
+}else{
+
+resultado += "⚠️ Divergência peso líquido<br>"
+
+}
+
+document.getElementById("resultado").innerHTML = resultado
+
+}
+
+</script>
+
+</body>
+</html>

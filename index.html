@@ -1,62 +1,26 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>AssistenteDeConferencia-CRT</title>
+<title>Assistente de Conferência CRT Mercosul</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <style>
-body{
-font-family:Arial;
-background:#f4f6f9;
-padding:40px;
-}
-
-.container{
-background:white;
-padding:30px;
-border-radius:10px;
-max-width:800px;
-margin:auto;
-box-shadow:0 4px 10px rgba(0,0,0,0.1);
-}
-
-h1{
-text-align:center;
-}
-
-.field{
-margin-bottom:15px;
-}
-
-label{
-font-weight:bold;
-}
-
-input{
-width:100%;
-padding:8px;
-margin-top:5px;
-}
-
-button{
-background:#0a4abf;
-color:white;
-border:none;
-padding:12px;
-width:100%;
-margin-top:20px;
-cursor:pointer;
-border-radius:6px;
-}
-
-.result{
-margin-top:20px;
-padding:15px;
-background:#eef3ff;
-border-radius:6px;
-}
+body{font-family:Arial;background:#f4f6f8;margin:0;padding:40px}
+.container{max-width:1000px;margin:auto;background:white;padding:30px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}
+h1{margin-top:0}
+.upload-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:25px}
+.card{border:1px solid #e5e7eb;border-radius:8px;padding:15px}
+button{padding:12px 20px;background:#2563eb;border:none;color:white;border-radius:6px;cursor:pointer}
+button:hover{background:#1d4ed8}
+.result{margin-top:30px;background:#f9fafb;padding:20px;border-radius:8px;white-space:pre-wrap;font-size:14px}
+.table{margin-top:20px;border-collapse:collapse;width:100%}
+.table td,.table th{border:1px solid #e5e7eb;padding:8px}
+.ok{color:green;font-weight:bold}
+.warn{color:#b45309;font-weight:bold}
+.err{color:red;font-weight:bold}
 </style>
 </head>
 
@@ -64,73 +28,61 @@ border-radius:6px;
 
 <div class="container">
 
-<h1>🔍 Conferência CRT Mercosul</h1>
+<h1>🔍 Assistente de Conferência CRT Mercosul</h1>
 
-<div class="field">
-<label>Upload CRT (PDF)</label>
-<input type="file" id="crtFile">
+<div class="upload-grid">
+
+<div class="card">
+<strong>CRT</strong><br>
+<input type="file" id="crt" accept=".pdf">
 </div>
 
-<button onclick="lerCRT()">Extrair Dados do CRT</button>
-
-<hr>
-
-<div class="field">
-<label>Remetente (CRT)</label>
-<input id="remetenteCRT" disabled>
+<div class="card">
+<strong>Invoice</strong><br>
+<input type="file" id="invoice" accept=".pdf">
 </div>
 
-<div class="field">
-<label>Remetente (Invoice)</label>
-<input id="remetenteInvoice">
+<div class="card">
+<strong>Packing List</strong><br>
+<input type="file" id="packing" accept=".pdf">
 </div>
 
-<div class="field">
-<label>Peso Bruto (CRT)</label>
-<input id="pbCRT" disabled>
+<div class="card">
+<strong>Cliente</strong><br>
+<select id="cliente">
+<option value="padrao">Padrão</option>
+<option value="linhanyl">Linhanyl</option>
+<option value="anastacio">Anastacio</option>
+</select>
 </div>
 
-<div class="field">
-<label>Peso Bruto (Packing List)</label>
-<input id="pbPL">
 </div>
 
-<div class="field">
-<label>Peso Líquido (CRT)</label>
-<input id="plCRT" disabled>
-</div>
+<button onclick="startAnalysis()">Iniciar Conferência</button>
 
-<div class="field">
-<label>Peso Líquido (Packing List)</label>
-<input id="plPL">
-</div>
+<div id="status" class="result">Aguardando documentos...</div>
 
-<button onclick="conferir()">Conferir Documento</button>
+<div id="tabela"></div>
 
-<div class="result" id="resultado"></div>
+<div id="observacoes" class="result"></div>
 
 </div>
 
 <script>
 
-async function lerCRT(){
-
-const file = document.getElementById("crtFile").files[0]
-
-if(!file){
-alert("Envie o CRT")
-return
-}
+async function extractTextFromPDF(file){
 
 const reader = new FileReader()
 
+return new Promise((resolve,reject)=>{
+
 reader.onload = async function(){
 
-const typedarray = new Uint8Array(this.result)
+const typedarray = new Uint8Array(reader.result)
 
 const pdf = await pdfjsLib.getDocument(typedarray).promise
 
-let texto = ""
+let text=""
 
 for(let i=1;i<=pdf.numPages;i++){
 
@@ -138,84 +90,139 @@ const page = await pdf.getPage(i)
 
 const content = await page.getTextContent()
 
-content.items.forEach(item=>{
-texto += item.str + " "
-})
+content.items.forEach(item=>{text+=item.str+" "})
 
 }
 
-extrairCampos(texto)
+resolve(text)
 
 }
 
 reader.readAsArrayBuffer(file)
 
-}
-
-function extrairCampos(texto){
-
-const remetenteMatch = texto.match(/LINHANYL|REMETENTE/i)
-const pbMatch = texto.match(/P\.B\.\:\s*([\d,]+)/)
-const plMatch = texto.match(/P\.L\.\:\s*([\d,]+)/)
-
-if(remetenteMatch){
-document.getElementById("remetenteCRT").value = "Remetente identificado"
-}
-
-if(pbMatch){
-document.getElementById("pbCRT").value = pbMatch[1]
-}
-
-if(plMatch){
-document.getElementById("plCRT").value = plMatch[1]
-}
+})
 
 }
 
-function conferir(){
+function extractField(text,regex){
 
-let resultado = ""
+const match=text.match(regex)
 
-const remetCRT = document.getElementById("remetenteCRT").value
-const remetInv = document.getElementById("remetenteInvoice").value
-
-const pbCRT = document.getElementById("pbCRT").value
-const pbPL = document.getElementById("pbPL").value
-
-const plCRT = document.getElementById("plCRT").value
-const plPL = document.getElementById("plPL").value
-
-if(remetCRT === remetInv){
-
-resultado += "✅ Remetente confere<br>"
-
-}else{
-
-resultado += "⚠️ Divergência de remetente<br>"
+return match?match[1].trim():""
 
 }
 
-if(pbCRT === pbPL){
+function extractCRTData(text){
 
-resultado += "✅ Peso bruto confere<br>"
-
-}else{
-
-resultado += "⚠️ Divergência peso bruto<br>"
+return{
+remetente:extractField(text,/REMETENTE[\s\S]*?([A-Z].*?S\.A\.|LTDA)/i),
+peso_bruto:extractField(text,/P\.B\.?\s*:?\s*([0-9.,]+)/i),
+peso_liquido:extractField(text,/P\.L\.?\s*:?\s*([0-9.,]+)/i),
+volumes:extractField(text,/([0-9]+)\s*(VOLUMES|CAJAS|VOLUME)/i)
+}
 
 }
 
-if(plCRT === plPL){
+function extractInvoiceData(text){
 
-resultado += "✅ Peso líquido confere<br>"
-
-}else{
-
-resultado += "⚠️ Divergência peso líquido<br>"
+return{
+peso_bruto:extractField(text,/GROSS\s*WEIGHT[^0-9]*([0-9.,]+)/i),
+peso_liquido:extractField(text,/NET\s*WEIGHT[^0-9]*([0-9.,]+)/i)
+}
 
 }
 
-document.getElementById("resultado").innerHTML = resultado
+function runRules(crt,invoice){
+
+let result=[]
+
+function check(field,a,b){
+
+if(!a||!b){
+result.push({campo:field,status:"warn",msg:"Dados não encontrados"})
+return
+}
+
+if(a==b){
+result.push({campo:field,status:"ok"})
+}
+else{
+result.push({campo:field,status:"err",msg:`CRT ${a} / Invoice ${b}`})
+}
+
+}
+
+check("Peso bruto",crt.peso_bruto,invoice.peso_bruto)
+check("Peso líquido",crt.peso_liquido,invoice.peso_liquido)
+
+return result
+
+}
+
+function renderTable(results){
+
+let html="<table class='table'><tr><th>Campo</th><th>Resultado</th></tr>"
+
+results.forEach(r=>{
+
+let label=""
+
+if(r.status=="ok") label="<span class='ok'>✔ Confere</span>"
+if(r.status=="warn") label="<span class='warn'>⚠ Verificar</span>"
+if(r.status=="err") label=`<span class='err'>✖ Divergência</span> ${r.msg}`
+
+html+=`<tr><td>${r.campo}</td><td>${label}</td></tr>`
+
+})
+
+html+="</table>"
+
+return html
+
+}
+
+async function startAnalysis(){
+
+const crtFile=document.getElementById("crt").files[0]
+const invoiceFile=document.getElementById("invoice").files[0]
+
+if(!crtFile||!invoiceFile){
+alert("Envie CRT e Invoice")
+return
+}
+
+const status=document.getElementById("status")
+
+status.innerText="Extraindo texto dos PDFs..."
+
+const crtText=await extractTextFromPDF(crtFile)
+const invoiceText=await extractTextFromPDF(invoiceFile)
+
+status.innerText="Extraindo campos..."
+
+const crtData=extractCRTData(crtText)
+const invoiceData=extractInvoiceData(invoiceText)
+
+status.innerText="Aplicando regras de conferência..."
+
+const results=runRules(crtData,invoiceData)
+
+status.innerText="Conferência concluída"
+
+const tabela=document.getElementById("tabela")
+
+tabela.innerHTML=renderTable(results)
+
+const divergencia=results.find(r=>r.status=="err")
+
+const obs=document.getElementById("observacoes")
+
+if(divergencia){
+obs.innerText="RESULTADO FINAL: REVISAR"
+}
+else{
+obs.innerText="RESULTADO FINAL: APROVADO"
+}
 
 }
 
